@@ -13,19 +13,16 @@ export default function ConfirmPage() {
 
   useEffect(() => {
     const confirmUser = async () => {
-      const token = searchParams.get("token")
+      const code = searchParams.get("code")
 
-      if (!token) {
+      if (!code) {
         setStatus("error")
         setMessage("Invalid confirmation link")
         return
       }
 
       try {
-        const { error } = await supabase.auth.verifyOtp({
-          token_hash: token,
-          type: "signup",
-        })
+        const { error } = await supabase.auth.exchangeCodeForSession(code)
 
         if (error) {
           setStatus("error")

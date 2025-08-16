@@ -70,9 +70,7 @@ export async function signUp(prevState: any, formData: FormData) {
       email: email.toString(),
       password: password.toString(),
       options: {
-        emailRedirectTo:
-          process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ||
-          `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/auth/confirm`,
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/auth/confirm`,
         data: {
           full_name: fullName.toString(),
           user_type: "landlord",
@@ -84,36 +82,6 @@ export async function signUp(prevState: any, formData: FormData) {
 
     if (error) {
       return { error: error.message }
-    }
-
-    if (data.user && !data.user.email_confirmed_at) {
-      try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-email`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
-          },
-          body: JSON.stringify({
-            type: "email_confirmation",
-            to: email.toString(),
-            data: {
-              user_id: data.user.id,
-              email: email.toString(),
-              full_name: fullName.toString(),
-              language: language.toString(),
-              confirmation_url: `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/auth/confirm?token=${data.user.id}&email=${email}`,
-            },
-          }),
-        })
-
-        if (!response.ok) {
-          console.error("Failed to send confirmation email")
-        }
-      } catch (emailError) {
-        console.error("Email sending error:", emailError)
-        // Don't fail the signup if email fails
-      }
     }
 
     return { success: "Check your email to confirm your account." }
