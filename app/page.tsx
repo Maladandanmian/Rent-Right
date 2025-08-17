@@ -1,4 +1,4 @@
-import { createClient, isSupabaseConfigured } from "@/lib/supabase/server"
+import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -6,8 +6,25 @@ import { Building2, Users, FileText, Wrench } from "lucide-react"
 import Link from "next/link"
 
 export default async function HomePage() {
-  // If Supabase is not configured, show setup message
-  if (!isSupabaseConfigured) {
+  let supabaseConnected = true
+  let session = null
+
+  try {
+    const supabase = createClient()
+    const { data, error } = await supabase.auth.getSession()
+    session = data.session
+
+    if (error) {
+      console.error("Supabase connection error:", error)
+      supabaseConnected = false
+    }
+  } catch (error) {
+    console.error("Failed to connect to Supabase:", error)
+    supabaseConnected = false
+  }
+
+  // If Supabase connection failed, show setup message
+  if (!supabaseConnected) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Card className="w-full max-w-md">
@@ -19,12 +36,6 @@ export default async function HomePage() {
       </div>
     )
   }
-
-  // Check if user is already logged in
-  const supabase = createClient()
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
 
   // If user is logged in, redirect to dashboard
   if (session) {
