@@ -48,19 +48,17 @@ const handler = async (req: Request): Promise<Response> => {
       // Send custom confirmation email
       const confirmationUrl = `${Deno.env.get("SITE_URL")}/auth/confirm?token=${record.confirmation_token}`
 
-      await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+      await fetch(`${SUPABASE_URL}/functions/v1/send-auth-email`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
         },
         body: JSON.stringify({
-          type: "confirmation",
-          to: email,
-          data: {
-            confirmationUrl,
-            lang: userMetadata.language || "en",
-          },
+          type: "signup",
+          email: email,
+          user_id: userId,
+          confirmation_url: confirmationUrl,
         }),
       })
     }
