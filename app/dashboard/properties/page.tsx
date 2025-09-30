@@ -30,15 +30,23 @@ export default async function PropertiesPage() {
   // Get properties with unit counts
   const { data: properties } = await supabase
     .from("properties")
-    .select(`
-      *,
-      units (
-        id,
-        status
-      )
-    `)
+    .select("*")
     .eq("landlord_id", user.id)
     .order("created_at", { ascending: false })
+
+  let propertiesWithUnits = []
+  if (properties && properties.length > 0) {
+    propertiesWithUnits = await Promise.all(
+      properties.map(async (property) => {
+        const { data: units } = await supabase.from("units").select("id, status").eq("property_id", property.id)
+
+        return {
+          ...property,
+          units: units || [],
+        }
+      }),
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -66,9 +74,9 @@ export default async function PropertiesPage() {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        {properties && properties.length > 0 ? (
+        {propertiesWithUnits && propertiesWithUnits.length > 0 ? (
           <div className="grid gap-6">
-            {properties.map((property: any) => {
+            {propertiesWithUnits.map((property: any) => {
               const totalUnits = property.units?.length || 0
               const occupiedUnits = property.units?.filter((unit: any) => unit.status === "occupied").length || 0
               const vacantUnits = property.units?.filter((unit: any) => unit.status === "vacant").length || 0

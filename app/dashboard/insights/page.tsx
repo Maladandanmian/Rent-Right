@@ -25,37 +25,67 @@ export default async function InsightsPage() {
   }
 
   // Get comprehensive analytics data
-  const { data: properties } = await supabase
-    .from("properties")
-    .select(`
-      *,
-      units (
-        id,
-        status,
-        monthly_rent,
-        tenancies (
-          id,
-          status,
-          monthly_rent,
-          lease_start,
-          lease_end,
-          rent_payments (
-            id,
-            amount,
-            status,
-            due_date,
-            paid_date
-          )
-        )
-      )
-    `)
-    .eq("landlord_id", user.id)
+  const { data: properties } = await supabase.from("properties").select("*").eq("landlord_id", user.id)
+
+  let propertiesWithData = []
+  if (properties && properties.length > 0) {
+    propertiesWithData = await Promise.all(
+      properties.map(async (property) => {
+        // Fetch units separately
+        const { data: units } = await supabase
+          .from("units")
+          .select("id, status, monthly_rent")
+          .eq("property_id", property.id)
+
+        // Fetch tenancies for these units
+        const unitIds = units?.map((u) => u.id) || []
+        let unitsWithTenancies = units || []
+
+        if (unitIds.length > 0) {
+          const { data: tenancies } = await supabase
+            .from("tenancies")
+            .select("id, unit_id, status, monthly_rent, lease_start, lease_end")
+            .in("unit_id", unitIds)
+
+          // Fetch rent payments for these tenancies
+          const tenancyIds = tenancies?.map((t) => t.id) || []
+          let tenanciesWithPayments = tenancies || []
+
+          if (tenancyIds.length > 0) {
+            const { data: rentPayments } = await supabase
+              .from("rent_payments")
+              .select("id, tenancy_id, amount, status, due_date, paid_date")
+              .in("tenancy_id", tenancyIds)
+
+            // Attach payments to tenancies
+            tenanciesWithPayments =
+              tenancies?.map((tenancy) => ({
+                ...tenancy,
+                rent_payments: rentPayments?.filter((p) => p.tenancy_id === tenancy.id) || [],
+              })) || []
+          }
+
+          // Attach tenancies to units
+          unitsWithTenancies =
+            units?.map((unit) => ({
+              ...unit,
+              tenancies: tenanciesWithPayments.filter((t) => t.unit_id === unit.id),
+            })) || []
+        }
+
+        return {
+          ...property,
+          units: unitsWithTenancies,
+        }
+      }),
+    )
+  }
 
   // Calculate key metrics
-  const totalProperties = properties?.length || 0
-  const totalUnits = properties?.reduce((sum, prop) => sum + (prop.units?.length || 0), 0) || 0
+  const totalProperties = propertiesWithData?.length || 0
+  const totalUnits = propertiesWithData?.reduce((sum, prop) => sum + (prop.units?.length || 0), 0) || 0
   const occupiedUnits =
-    properties?.reduce(
+    propertiesWithData?.reduce(
       (sum, prop) => sum + (prop.units?.filter((unit) => unit.status === "occupied").length || 0),
       0,
     ) || 0
@@ -63,7 +93,7 @@ export default async function InsightsPage() {
 
   // Calculate monthly revenue
   const monthlyRevenue =
-    properties?.reduce(
+    propertiesWithData?.reduce(
       (sum, prop) =>
         sum +
         (prop.units
@@ -75,7 +105,7 @@ export default async function InsightsPage() {
   // Calculate annual revenue projection
   const annualProjection = monthlyRevenue * 12
 
-  const unitIds = properties?.flatMap((prop) => prop.units?.map((unit) => unit.id) || []) || []
+  const unitIds = propertiesWithData?.flatMap((prop) => prop.units?.map((unit) => unit.id) || []) || []
 
   let maintenanceData = null
   if (unitIds.length > 0) {
@@ -93,7 +123,7 @@ export default async function InsightsPage() {
 
   // Calculate collection rate
   const allPayments =
-    properties?.flatMap(
+    propertiesWithData?.flatMap(
       (prop) =>
         prop.units?.flatMap((unit) => unit.tenancies?.flatMap((tenancy) => tenancy.rent_payments || []) || []) || [],
     ) || []
@@ -202,7 +232,7 @@ export default async function InsightsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <RevenueChart data={properties || []} language={profile?.preferred_language} />
+              <RevenueChart data={propertiesWithData || []} language={profile?.preferred_language} />
             </CardContent>
           </Card>
 
@@ -214,7 +244,7 @@ export default async function InsightsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <OccupancyChart data={properties || []} language={profile?.preferred_language} />
+              <OccupancyChart data={propertiesWithData || []} language={profile?.preferred_language} />
             </CardContent>
           </Card>
         </div>

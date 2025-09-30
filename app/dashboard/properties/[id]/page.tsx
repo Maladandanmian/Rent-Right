@@ -30,26 +30,52 @@ export default async function PropertyDetailsPage({ params }: { params: { id: st
   // Get property with units and tenancies
   const { data: property } = await supabase
     .from("properties")
-    .select(`
-      *,
-      units (
-        *,
-        tenancies (
-          *,
-          tenant:profiles (
-            full_name,
-            email,
-            phone
-          )
-        )
-      )
-    `)
+    .select("*")
     .eq("id", params.id)
     .eq("landlord_id", user.id)
     .single()
 
   if (!property) {
     redirect("/dashboard/properties")
+  }
+
+  // Fetch units separately
+  const { data: units } = await supabase.from("units").select("*").eq("property_id", property.id)
+
+  // Fetch tenancies and tenant profiles for these units
+  let unitsWithTenancies = units || []
+  if (units && units.length > 0) {
+    const unitIds = units.map((u) => u.id)
+    const { data: tenancies } = await supabase.from("tenancies").select("*, tenant_id").in("unit_id", unitIds)
+
+    // Fetch tenant profiles
+    const tenantIds = tenancies?.map((t) => t.tenant_id).filter(Boolean) || []
+    let tenantProfiles: any[] = []
+    if (tenantIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, full_name, email, phone")
+        .in("id", tenantIds)
+      tenantProfiles = profiles || []
+    }
+
+    // Attach tenant profiles to tenancies
+    const tenanciesWithProfiles =
+      tenancies?.map((tenancy) => ({
+        ...tenancy,
+        tenant: tenantProfiles.find((p) => p.id === tenancy.tenant_id),
+      })) || []
+
+    // Attach tenancies to units
+    unitsWithTenancies = units.map((unit) => ({
+      ...unit,
+      tenancies: tenanciesWithProfiles.filter((t) => t.unit_id === unit.id),
+    }))
+  }
+
+  const propertyWithUnits = {
+    ...property,
+    units: unitsWithTenancies,
   }
 
   return (
@@ -67,9 +93,9 @@ export default async function PropertyDetailsPage({ params }: { params: { id: st
               {profile?.preferred_language === "zh" ? "物業" : "Properties"}
             </Link>
             <span className="text-gray-300">/</span>
-            <h1 className="text-xl font-semibold text-gray-900">{property.name}</h1>
+            <h1 className="text-xl font-semibold text-gray-900">{propertyWithUnits.name}</h1>
           </div>
-          <Link href={`/dashboard/properties/${property.id}/units/new`}>
+          <Link href={`/dashboard/properties/${propertyWithUnits.id}/units/new`}>
             <Button className="bg-blue-600 hover:bg-blue-700">
               <Plus className="h-4 w-4 mr-2" />
               {profile?.preferred_language === "zh" ? "添加單位" : "Add Unit"}
@@ -85,20 +111,20 @@ export default async function PropertyDetailsPage({ params }: { params: { id: st
           <CardHeader>
             <div className="flex items-start justify-between">
               <div>
-                <CardTitle className="text-2xl">{property.name}</CardTitle>
+                <CardTitle className="text-2xl">{propertyWithUnits.name}</CardTitle>
                 <CardDescription className="flex items-center mt-2">
                   <MapPin className="h-4 w-4 mr-1" />
-                  {property.address}
-                  {property.district && `, ${property.district}`}
+                  {propertyWithUnits.address}
+                  {propertyWithUnits.district && `, ${propertyWithUnits.district}`}
                 </CardDescription>
               </div>
               <div className="flex items-center space-x-2">
-                <Badge variant={property.property_type === "residential" ? "default" : "secondary"}>
-                  {property.property_type === "residential"
+                <Badge variant={propertyWithUnits.property_type === "residential" ? "default" : "secondary"}>
+                  {propertyWithUnits.property_type === "residential"
                     ? profile?.preferred_language === "zh"
                       ? "住宅"
                       : "Residential"
-                    : property.property_type === "commercial"
+                    : propertyWithUnits.property_type === "commercial"
                       ? profile?.preferred_language === "zh"
                         ? "商業"
                         : "Commercial"
@@ -118,13 +144,13 @@ export default async function PropertyDetailsPage({ params }: { params: { id: st
         {/* Units Grid */}
         <div className="mb-6">
           <h3 className="text-xl font-semibold text-gray-900 mb-4">
-            {profile?.preferred_language === "zh" ? "單位" : "Units"} ({property.units?.length || 0})
+            {profile?.preferred_language === "zh" ? "單位" : "Units"} ({propertyWithUnits.units?.length || 0})
           </h3>
         </div>
 
-        {property.units && property.units.length > 0 ? (
+        {propertyWithUnits.units && propertyWithUnits.units.length > 0 ? (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {property.units.map((unit: any) => {
+            {propertyWithUnits.units.map((unit: any) => {
               const activeTenancy = unit.tenancies?.find((t: any) => t.status === "active")
               const tenant = activeTenancy?.tenant
 
@@ -220,14 +246,14 @@ export default async function PropertyDetailsPage({ params }: { params: { id: st
 
                       {/* Actions */}
                       <div className="flex gap-2">
-                        <Link href={`/dashboard/properties/${property.id}/units/${unit.id}`}>
+                        <Link href={`/dashboard/properties/${propertyWithUnits.id}/units/${unit.id}`}>
                           <Button variant="outline" size="sm" className="flex-1 bg-transparent">
                             <Home className="h-4 w-4 mr-2" />
                             {profile?.preferred_language === "zh" ? "詳情" : "Details"}
                           </Button>
                         </Link>
                         {!tenant && (
-                          <Link href={`/dashboard/properties/${property.id}/units/${unit.id}/invite`}>
+                          <Link href={`/dashboard/properties/${propertyWithUnits.id}/units/${unit.id}/invite`}>
                             <Button size="sm" className="flex-1 bg-blue-600 hover:bg-blue-700">
                               <Users className="h-4 w-4 mr-2" />
                               {profile?.preferred_language === "zh" ? "邀請租客" : "Invite Tenant"}
@@ -253,7 +279,7 @@ export default async function PropertyDetailsPage({ params }: { params: { id: st
                   ? "為此物業添加單位以開始管理租務"
                   : "Add units to this property to start managing rentals"}
               </p>
-              <Link href={`/dashboard/properties/${property.id}/units/new`}>
+              <Link href={`/dashboard/properties/${propertyWithUnits.id}/units/new`}>
                 <Button className="bg-blue-600 hover:bg-blue-700">
                   <Plus className="h-4 w-4 mr-2" />
                   {profile?.preferred_language === "zh" ? "添加單位" : "Add Unit"}
