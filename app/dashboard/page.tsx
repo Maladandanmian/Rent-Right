@@ -66,17 +66,17 @@ export default async function DashboardPage() {
       0,
     )
 
-    // Get maintenance requests count
-    const { count } = await supabase
-      .from("maintenance_requests")
-      .select("*", { count: "exact", head: true })
-      .in(
-        "unit_id",
-        properties.flatMap((prop: any) => prop.units?.map((unit: any) => unit.id) || []),
-      )
-      .eq("status", "open")
+    const unitIds = properties.flatMap((prop: any) => prop.units?.map((unit: any) => unit.id) || [])
 
-    maintenanceRequests = count || 0
+    if (unitIds.length > 0) {
+      const { count } = await supabase
+        .from("maintenance_requests")
+        .select("*", { count: "exact", head: true })
+        .in("unit_id", unitIds)
+        .eq("status", "open")
+
+      maintenanceRequests = count || 0
+    }
   }
 
   return (

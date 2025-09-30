@@ -75,13 +75,19 @@ export default async function InsightsPage() {
   // Calculate annual revenue projection
   const annualProjection = monthlyRevenue * 12
 
-  // Get maintenance costs for current year
-  const { data: maintenanceData } = await supabase
-    .from("maintenance_requests")
-    .select("actual_cost, completed_date")
-    .in("unit_id", properties?.flatMap((prop) => prop.units?.map((unit) => unit.id) || []) || [])
-    .gte("completed_date", new Date(new Date().getFullYear(), 0, 1).toISOString())
-    .not("actual_cost", "is", null)
+  const unitIds = properties?.flatMap((prop) => prop.units?.map((unit) => unit.id) || []) || []
+
+  let maintenanceData = null
+  if (unitIds.length > 0) {
+    const { data } = await supabase
+      .from("maintenance_requests")
+      .select("actual_cost, completed_date")
+      .in("unit_id", unitIds)
+      .gte("completed_date", new Date(new Date().getFullYear(), 0, 1).toISOString())
+      .not("actual_cost", "is", null)
+
+    maintenanceData = data
+  }
 
   const totalMaintenanceCosts = maintenanceData?.reduce((sum, req) => sum + (req.actual_cost || 0), 0) || 0
 
