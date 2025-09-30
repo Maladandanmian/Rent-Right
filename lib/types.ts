@@ -32,6 +32,8 @@ export interface Unit {
   monthly_rent?: number
   deposit_amount?: number
   status: "vacant" | "occupied" | "maintenance"
+  room_assignments?: string[]
+  appliances?: string[]
   created_at: string
   updated_at: string
 }

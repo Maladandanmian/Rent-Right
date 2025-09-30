@@ -25,7 +25,18 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, address, district, property_type, total_units } = body
+    const {
+      name,
+      address,
+      district,
+      property_type,
+      total_units,
+      size_sqft,
+      bedrooms,
+      bathrooms,
+      room_assignments,
+      appliances,
+    } = body
 
     // Validate required fields
     if (!name || !address || !property_type || !total_units) {
@@ -49,6 +60,24 @@ export async function POST(request: NextRequest) {
     if (propertyError) {
       console.error("Property creation error:", propertyError)
       return NextResponse.json({ error: "Failed to create property" }, { status: 500 })
+    }
+
+    if (size_sqft || bedrooms || bathrooms || room_assignments || appliances) {
+      const { error: unitError } = await supabase.from("units").insert({
+        property_id: property.id,
+        unit_number: "Unit 1",
+        size_sqft,
+        bedrooms,
+        bathrooms,
+        room_assignments,
+        appliances,
+        status: "vacant",
+      })
+
+      if (unitError) {
+        console.error("Unit creation error:", unitError)
+        // Don't fail the property creation if unit creation fails
+      }
     }
 
     return NextResponse.json(property)
