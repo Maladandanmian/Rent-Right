@@ -6,7 +6,10 @@ import Link from "next/link"
 import PropertyForm from "@/components/properties/property-form"
 
 export default async function NewPropertyPage() {
+  console.log("[v0] NewPropertyPage: Starting to render")
+
   if (!isSupabaseConfigured) {
+    console.log("[v0] NewPropertyPage: Supabase not configured, redirecting to /")
     redirect("/")
   }
 
@@ -15,16 +18,24 @@ export default async function NewPropertyPage() {
     data: { user },
   } = await supabase.auth.getUser()
 
+  console.log("[v0] NewPropertyPage: User authenticated:", !!user)
+
   if (!user) {
+    console.log("[v0] NewPropertyPage: No user, redirecting to login")
     redirect("/auth/login")
   }
 
   // Get user profile
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
 
+  console.log("[v0] NewPropertyPage: Profile loaded, user_type:", profile?.user_type)
+
   if (profile?.user_type !== "landlord") {
+    console.log("[v0] NewPropertyPage: Not a landlord, redirecting to dashboard")
     redirect("/dashboard")
   }
+
+  console.log("[v0] NewPropertyPage: Rendering form")
 
   return (
     <div className="min-h-screen bg-gray-50">
