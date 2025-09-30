@@ -26,6 +26,18 @@ export async function signIn(prevState: any, formData: FormData) {
     })
 
     if (error) {
+      if (error.message.includes("Invalid login credentials")) {
+        return {
+          error:
+            "Invalid email or password. Please check your credentials and try again. If you haven't confirmed your email yet, please check your inbox. / 電郵或密碼無效。請檢查您的憑證並重試。如果您尚未確認電郵，請檢查您的收件箱。",
+        }
+      }
+      if (error.message.includes("Email not confirmed")) {
+        return {
+          error:
+            "Please confirm your email address before logging in. Check your inbox for the confirmation link. / 請在登入前確認您的電郵地址。請檢查您的收件箱以獲取確認連結。",
+        }
+      }
       return { error: error.message }
     }
 
