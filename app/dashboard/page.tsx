@@ -39,19 +39,34 @@ export default async function DashboardPage() {
   let maintenanceRequests = 0
 
   if (profile?.user_type === "landlord") {
+    // This is a temporary workaround until the RLS policies are fixed in the database
     const { data: propertiesData } = await supabase
       .from("properties")
-      .select(`
-        *,
-        units (
-          id,
-          status,
-          monthly_rent
-        )
-      `)
+      .select("*")
       .eq("landlord_id", user.id)
+      .order("created_at", { ascending: false })
 
-    properties = propertiesData || []
+    if (propertiesData && propertiesData.length > 0) {
+      // Fetch units separately for each property
+      const propertiesWithUnits = await Promise.all(
+        propertiesData.map(async (property) => {
+          const { data: units } = await supabase
+            .from("units")
+            .select("id, status, monthly_rent")
+            .eq("property_id", property.id)
+
+          return {
+            ...property,
+            units: units || [],
+          }
+        }),
+      )
+
+      properties = propertiesWithUnits
+    } else {
+      properties = []
+    }
+
     totalUnits = properties.reduce((sum: number, prop: any) => sum + (prop.units?.length || 0), 0)
     occupiedUnits = properties.reduce(
       (sum: number, prop: any) => sum + (prop.units?.filter((unit: any) => unit.status === "occupied").length || 0),
